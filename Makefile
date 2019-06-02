@@ -2,27 +2,40 @@ AWS_BUCKET     ?= cf-templates-blah-ap-southeast-2
 AWS_REGION     ?= ap-southeast-2
 AWS_STACK_NAME := golang-lambda
 
-build:
-	mkdir -p dist
-	GOOS=linux go build -o dist/customresource main.go
+DIST_DIR := dist
+BIN      := $(DIST_DIR)/handler
+SRC      := $(shell find . -type f \( -name '*.go' -o -name 'go.*' \))
 
-package: build
-	aws cloudformation package             \
-		--template-file stack.yml          \
-		--region $(AWS_REGION)             \
-        --s3-bucket $(AWS_BUCKET)          \
-        --output-template-file package.yml
+TEMPLATE_FILE     := stack.yml
+PACKAGED_TEMPLATE := $(DIST_DIR)/package.yml
 
-deploy: package
+clean:
+	rm -rf $(DIST_DIR)
+
+test: $(SRC)
+	go test ./...
+
+deploy: $(PACKAGED_TEMPLATE)
 	aws cloudformation deploy         \
-		--template-file package.yml   \
+		--template-file $<            \
 		--region $(AWS_REGION)        \
 		--capabilities CAPABILITY_IAM \
 		--stack-name $(AWS_STACK_NAME)
 
-example:
-	aws cloudformation deploy         \
-		--template-file example.yml   \
+delete:
+	aws cloudformation delete-stack   \
 		--region $(AWS_REGION)        \
-		--capabilities CAPABILITY_IAM \
-		--stack-name example-$(AWS_STACK_NAME)
+		--stack-name $(AWS_STACK_NAME)
+
+$(PACKAGED_TEMPLATE): $(BIN)
+	aws cloudformation package             \
+		--template-file $(TEMPLATE_FILE)   \
+		--region $(AWS_REGION)             \
+        --s3-bucket $(AWS_BUCKET)          \
+        --output-template $@
+
+$(BIN): test
+	mkdir -p $(@D)
+	GOOS=linux go build -o $@ main.go
+
+.PHONY: clean deploy delete test

@@ -4,7 +4,7 @@ Resources:
   Function:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: dist/customresource
+      Handler: dist/handler
       Runtime: go1.x
 Outputs:
   ServiceToken:
